@@ -54,6 +54,7 @@ PROFANE_SUBSTRINGS = (
     "пизд",
     "сук",
     "хер",
+    "хуи",
     "хуй",
     "хуе",
     "хуя",
@@ -123,6 +124,9 @@ def canonicalize_term(term: str) -> str:
 
 def looks_profane(term: str) -> bool:
     canonical = canonicalize_term(term)
+    if canonical in {"еб", "ёб"}:
+        return True
+
     if len(canonical) < 3:
         return False
 

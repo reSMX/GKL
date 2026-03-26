@@ -171,7 +171,7 @@
 
     for (const token of iterateWordTokens(text)) {
       const normalizedToken = normalizeToken(token.raw);
-      if (!normalizedToken || normalizedToken.length < 3) {
+      if (!normalizedToken || normalizedToken.length < 2) {
         continue;
       }
 

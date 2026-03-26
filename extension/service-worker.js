@@ -260,23 +260,10 @@ async function ensureBundleLoaded(options) {
     return activeBundle;
   }
 
-  const stored = await chrome.storage.local.get(STORAGE_KEYS.dataBundle);
-  if (stored[STORAGE_KEYS.dataBundle]) {
-    setActiveBundle(normalizeBundle(stored[STORAGE_KEYS.dataBundle]));
-  }
-
-  if (activeBundle && !forceRefresh) {
-    return activeBundle;
-  }
-
   const settings = await getSettings();
   const source = await resolveBundleSource(settings);
   const bundle = await loadBundle(source);
   setActiveBundle(bundle);
-
-  await chrome.storage.local.set({
-    [STORAGE_KEYS.dataBundle]: bundle
-  });
 
   await appendUpdateHistory({
     checkedAt: new Date().toISOString(),

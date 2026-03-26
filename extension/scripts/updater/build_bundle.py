@@ -15,35 +15,19 @@ from rkn_registry import load_rkn_entries
 ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = ROOT.parent.parent / "data" / "default-bundle.json"
 TOKEN_RE = re.compile(r"[0-9A-Za-zА-Яа-яЁё]+", re.UNICODE)
-TOKEN_CHAR_RE = re.compile(r"[а-яёa-z0-9]", re.IGNORECASE)
-CONFUSABLE_MAP = {
-    "@": "а",
-    "0": "о",
-    "1": "и",
-    "3": "з",
-    "4": "ч",
-    "6": "б",
-    "8": "в",
-    "a": "а",
-    "c": "с",
-    "e": "е",
-    "h": "н",
-    "k": "к",
-    "m": "м",
-    "o": "о",
-    "p": "р",
-    "t": "т",
-    "x": "х",
-    "y": "у",
-}
-PROFANE_SUBSTRINGS = (
+PROFANE_ROOTS = (
     "бля",
-    "бляд",
     "говн",
     "дерьм",
     "долбоеб",
-    "жоп",
+    "еб",
+    "еба",
+    "ебл",
+    "ебош",
+    "ебун",
+    "ебуч",
     "залуп",
+    "жоп",
     "манд",
     "муд",
     "нах",
@@ -53,22 +37,11 @@ PROFANE_SUBSTRINGS = (
     "пидр",
     "пизд",
     "сук",
-    "хер",
-    "хуй",
     "хуе",
+    "хуй",
     "хуя",
     "хую",
-    "хуйн",
-    "хуев",
-    "хуищ",
-    "хуяч",
-    "хуяр",
-    "хули",
-)
-EB_PATTERNS = (
-    re.compile(r"^[её]б", re.IGNORECASE),
-    re.compile(r"^(?:вы|за|до|на|по|про|под|пере|об|от|с|съ|вз|въ|из|изъ|раз|у|при|недо|подъ)[её]б", re.IGNORECASE),
-    re.compile(r"[её]б(?:а|л|н|т|уч|ош|аш|ун|ыр|от|ок|ец|арь|ист|лив|ищ|ц|ст|ти|ля|ло|ель|аль|ан)", re.IGNORECASE),
+    "хер",
 )
 
 
@@ -103,18 +76,8 @@ def resolve_source_path(source: str) -> str:
     return str((ROOT / source).resolve())
 
 
-def normalize_character(character: str) -> str:
-    lowered = character.lower()
-    return CONFUSABLE_MAP.get(lowered, lowered)
-
-
 def normalize_term(term: str) -> str:
-    normalized = []
-    for character in str(term or ""):
-        mapped = normalize_character(character)
-        if TOKEN_CHAR_RE.fullmatch(mapped):
-            normalized.append(mapped)
-    return "".join(normalized)
+    return "".join(TOKEN_RE.findall(term.lower()))
 
 
 def canonicalize_term(term: str) -> str:
@@ -126,10 +89,7 @@ def looks_profane(term: str) -> bool:
     if len(canonical) < 3:
         return False
 
-    if any(part in canonical for part in PROFANE_SUBSTRINGS):
-        return True
-
-    return any(pattern.search(canonical) for pattern in EB_PATTERNS)
+    return any(root in canonical for root in PROFANE_ROOTS)
 
 
 def iter_line_terms(line: str):

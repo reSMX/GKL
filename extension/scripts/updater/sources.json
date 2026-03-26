@@ -1,7 +1,7 @@
 {
   "manual_profane_terms": {
     "path": "data/manual-profanity.txt",
-    "severity": "high",
+    "severity": "medium",
     "replacement": "грубое выражение"
   },
   "rkn_registry": {

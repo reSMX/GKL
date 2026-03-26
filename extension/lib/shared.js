@@ -9,13 +9,13 @@
   const DEFAULT_SETTINGS = {
     filteringEnabled: true,
     blockingEnabled: true,
-    strictness: "medium",
+    strictness: "high",
     replacementMode: "mask",
     replacementWord: "[скрыто]",
     trustedSites: [],
     customExceptions: [],
     remoteDataUrl: "",
-    autoUpdateHours: 6
+    autoUpdateHours: 168
   };
 
   const STRICTNESS_RANK = {
@@ -29,6 +29,8 @@
     medium: 2,
     high: 3
   };
+
+  const TOKEN_CHARACTER_RE = /[a-zа-яё]/iu;
 
   const CONFUSABLE_MAP = {
     "@": "а",
@@ -90,7 +92,7 @@
     return String(value || "")
       .split("")
       .map((character) => normalizeCharacter(character))
-      .filter((character) => /[a-zа-яё]/iu.test(character))
+      .filter((character) => TOKEN_CHARACTER_RE.test(character))
       .join("");
   }
 
@@ -104,7 +106,7 @@
       }
 
       const normalized = normalizeCharacter(character);
-      if (!/[a-zа-яё]/iu.test(normalized)) {
+      if (!TOKEN_CHARACTER_RE.test(normalized)) {
         return;
       }
 
@@ -219,6 +221,7 @@
               lemma: String(entry.lemma || `rule-${index + 1}`),
               severity: String(entry.severity || "medium"),
               replacement: String(entry.replacement || "нежелательное выражение"),
+              allowMultiword: Boolean(entry.allowMultiword),
               patterns: Array.isArray(entry.patterns)
                 ? uniqueStrings(entry.patterns.map((item) => String(item || "").trim()).filter(Boolean))
                 : []

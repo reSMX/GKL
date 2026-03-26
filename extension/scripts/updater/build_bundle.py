@@ -2,22 +2,62 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from rkn_registry import load_rkn_entries
 
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = ROOT.parent.parent / "data" / "default-bundle.json"
+TOKEN_RE = re.compile(r"[0-9A-Za-zА-Яа-яЁё]+", re.UNICODE)
+PROFANE_ROOTS = (
+    "бля",
+    "говн",
+    "дерьм",
+    "долбоеб",
+    "еб",
+    "еба",
+    "ебл",
+    "ебош",
+    "ебун",
+    "ебуч",
+    "залуп",
+    "жоп",
+    "манд",
+    "муд",
+    "нах",
+    "педик",
+    "пидар",
+    "пидор",
+    "пидр",
+    "пизд",
+    "сук",
+    "хуе",
+    "хуй",
+    "хуя",
+    "хую",
+    "хер",
+)
 
 
 def read_text_source(path_or_url: str) -> str:
     if urlparse(path_or_url).scheme in {"http", "https"}:
-        with urlopen(path_or_url) as response:
-            return response.read().decode("utf-8")
+        last_error = None
+        for _ in range(5):
+            try:
+                request = Request(path_or_url, headers={"User-Agent": "CenzControlUpdater/1.0"})
+                with urlopen(request, timeout=60) as response:
+                    return response.read().decode("utf-8")
+            except Exception as error:
+                last_error = error
+                time.sleep(2)
+        raise last_error
+
     return (ROOT / path_or_url).read_text(encoding="utf-8")
 
 
@@ -34,6 +74,53 @@ def resolve_source_path(source: str) -> str:
         return str(candidate.resolve())
 
     return str((ROOT / source).resolve())
+
+
+def normalize_term(term: str) -> str:
+    return "".join(TOKEN_RE.findall(term.lower()))
+
+
+def canonicalize_term(term: str) -> str:
+    return normalize_term(term).replace("ё", "е")
+
+
+def looks_profane(term: str) -> bool:
+    canonical = canonicalize_term(term)
+    if len(canonical) < 3:
+        return False
+
+    return any(root in canonical for root in PROFANE_ROOTS)
+
+
+def iter_line_terms(line: str):
+    for chunk in TOKEN_RE.findall(str(line or "")):
+        term = normalize_term(chunk)
+        if term:
+            yield term
+
+
+def extract_profane_terms(lines: list[str]) -> list[str]:
+    terms = set()
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        for term in iter_line_terms(stripped):
+            if looks_profane(term):
+                terms.add(term)
+
+    return sorted(terms)
+
+
+def make_exact_term_pattern(term: str) -> str:
+    parts = []
+    for character in term:
+        if character in {"е", "ё"}:
+            parts.append("[её]")
+        else:
+            parts.append(re.escape(character))
+    return "".join(parts)
 
 
 def load_blocked_sites(config: dict, rkn_source: str | None, rkn_headers: str | None, rkn_format: str) -> list[dict]:
@@ -79,16 +166,29 @@ def load_blocked_sites(config: dict, rkn_source: str | None, rkn_headers: str | 
     return deduped
 
 
-def build_bundle(config_path: Path, rkn_source: str | None, rkn_headers: str | None, rkn_format: str) -> dict:
-    config = json.loads(config_path.read_text(encoding="utf-8"))
-    blocked_sites = load_blocked_sites(config, rkn_source=rkn_source, rkn_headers=rkn_headers, rkn_format=rkn_format)
+def load_dictionary(config: dict) -> list[dict]:
     dictionary = []
-    exceptions = []
 
     for item in config.get("dictionary", []):
-        data = read_json_source(item["path"])
-        dictionary.extend(data)
+        dictionary.extend(read_json_source(item["path"]))
 
+    source_config = config.get("manual_profane_terms", {})
+    if source_config.get("path"):
+        terms = extract_profane_terms(read_text_source(source_config["path"]).splitlines())
+        if terms:
+            dictionary.append({
+                "id": "manual-profane-vocabulary",
+                "lemma": "Ручной неизменяемый словарь матов проекта",
+                "severity": source_config.get("severity", "high"),
+                "replacement": source_config.get("replacement", "грубое выражение"),
+                "patterns": [make_exact_term_pattern(term) for term in terms]
+            })
+
+    return dictionary
+
+
+def load_exceptions(config: dict) -> list[str]:
+    exceptions = []
     for item in config.get("exceptions", []):
         entries = [
             line.strip().lower()
@@ -97,6 +197,15 @@ def build_bundle(config_path: Path, rkn_source: str | None, rkn_headers: str | N
         ]
         exceptions.extend(entries)
 
+    return sorted(set(exceptions))
+
+
+def build_bundle(config_path: Path, rkn_source: str | None, rkn_headers: str | None, rkn_format: str) -> dict:
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    blocked_sites = load_blocked_sites(config, rkn_source=rkn_source, rkn_headers=rkn_headers, rkn_format=rkn_format)
+    dictionary = load_dictionary(config)
+    exceptions = load_exceptions(config)
+
     timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return {
         "version": timestamp.replace(":", "").replace("-", ""),
@@ -104,11 +213,11 @@ def build_bundle(config_path: Path, rkn_source: str | None, rkn_headers: str | N
         "metadata": {
             "sourceLabel": "generated-by-updater",
             "checkedAt": timestamp,
-            "notes": "Bundle сформирован локальным скриптом и готов к публикации в GitHub Raw."
+            "notes": "Bundle сформирован локальным скриптом, включает weekly upstream из Re-filter-lists, статичный adult-список и ручной словарь матов."
         },
         "blockedSites": blocked_sites,
         "dictionary": dictionary,
-        "exceptions": sorted(set(exceptions))
+        "exceptions": exceptions
     }
 
 

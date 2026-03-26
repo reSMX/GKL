@@ -16,6 +16,7 @@ const SOURCE_CONFIG_PATH = "data/source-config.json";
 
 let activeBundle = null;
 let sourceConfigCache = null;
+let activeBundleIndex = createBundleIndex({ blockedSites: [] });
 
 chrome.runtime.onInstalled.addListener(async () => {
   chrome.alarms.create("cc-refresh-data", {
@@ -259,7 +260,7 @@ async function ensureBundleLoaded(options) {
 
   const stored = await chrome.storage.local.get(STORAGE_KEYS.dataBundle);
   if (stored[STORAGE_KEYS.dataBundle]) {
-    activeBundle = normalizeBundle(stored[STORAGE_KEYS.dataBundle]);
+    setActiveBundle(normalizeBundle(stored[STORAGE_KEYS.dataBundle]));
   }
 
   if (activeBundle && !forceRefresh) {
@@ -269,7 +270,7 @@ async function ensureBundleLoaded(options) {
   const settings = await getSettings();
   const source = await resolveBundleSource(settings);
   const bundle = await loadBundle(source);
-  activeBundle = bundle;
+  setActiveBundle(bundle);
 
   await chrome.storage.local.set({
     [STORAGE_KEYS.dataBundle]: bundle
@@ -320,6 +321,35 @@ function normalizeSourceConfig(payload) {
       bundlePath: String(repo.bundlePath || "extension/data/default-bundle.json").trim() || "extension/data/default-bundle.json"
     }
   };
+}
+
+function setActiveBundle(bundle) {
+  activeBundle = bundle;
+  activeBundleIndex = createBundleIndex(bundle);
+}
+
+function createBundleIndex(bundle) {
+  const domainMap = new Map();
+  const hostnameMap = new Map();
+  const urlContains = [];
+
+  for (const entry of bundle.blockedSites || []) {
+    if (entry.type === "domain") {
+      domainMap.set(entry.value, entry);
+      continue;
+    }
+
+    if (entry.type === "hostname") {
+      hostnameMap.set(entry.value, entry);
+      continue;
+    }
+
+    if (entry.type === "url-contains") {
+      urlContains.push(entry);
+    }
+  }
+
+  return { domainMap, hostnameMap, urlContains };
 }
 
 async function resolveBundleSource(settings) {
@@ -418,16 +448,25 @@ function matchBlockedSite(url, blockedSites) {
   const normalizedUrl = String(url || "").toLowerCase();
   const hostname = normalizeHost(getHostnameFromUrl(url));
 
-  for (const entry of blockedSites || []) {
-    if (entry.type === "domain" && (hostname === entry.value || hostname.endsWith(`.${entry.value}`))) {
-      return entry;
+  if (activeBundleIndex.hostnameMap.has(hostname)) {
+    return activeBundleIndex.hostnameMap.get(hostname);
+  }
+
+  let candidate = hostname;
+  while (candidate) {
+    if (activeBundleIndex.domainMap.has(candidate)) {
+      return activeBundleIndex.domainMap.get(candidate);
     }
 
-    if (entry.type === "hostname" && hostname === entry.value) {
-      return entry;
+    const dotIndex = candidate.indexOf(".");
+    if (dotIndex === -1) {
+      break;
     }
+    candidate = candidate.slice(dotIndex + 1);
+  }
 
-    if (entry.type === "url-contains" && normalizedUrl.includes(entry.value)) {
+  for (const entry of activeBundleIndex.urlContains) {
+    if (normalizedUrl.includes(entry.value)) {
       return entry;
     }
   }

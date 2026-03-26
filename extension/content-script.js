@@ -9,6 +9,7 @@
   const state = {
     settings: null,
     bundle: null,
+    compiledRules: [],
     isTrusted: false,
     replacedCount: 0,
     scannedNodes: 0,
@@ -39,6 +40,7 @@
     state.settings = response.settings;
     state.bundle = response.bundle;
     state.isTrusted = response.isTrusted;
+    state.compiledRules = compileRules();
 
     if (!state.settings.filteringEnabled || state.isTrusted) {
       scheduleReport();
@@ -113,7 +115,12 @@
     }
 
     state.scannedNodes += 1;
-    const transformed = transformText(originalText);
+    let transformed = null;
+    try {
+      transformed = transformText(originalText);
+    } catch (error) {
+      return;
+    }
     if (!transformed || transformed.text === originalText) {
       return;
     }
@@ -137,13 +144,8 @@
     const exceptionRanges = collectExceptionRanges(scan.normalized);
     const matches = [];
 
-    for (const rule of state.bundle.dictionary || []) {
-      if (!shouldUseRule(rule.severity, state.settings.strictness)) {
-        continue;
-      }
-
-      for (const pattern of rule.patterns) {
-        const regex = new RegExp(pattern, "giu");
+    for (const rule of state.compiledRules) {
+      for (const regex of rule.regexes) {
         for (const match of scan.normalized.matchAll(regex)) {
           const matchedText = match[0];
           if (!matchedText) {
@@ -162,11 +164,11 @@
             continue;
           }
 
-          const rawSlice = text.slice(rawStart, rawEnd);
-          if (!isWordLikeMatch(rawSlice)) {
+          if (!isWordLikeMatch(text, rawStart, rawEnd, rule)) {
             continue;
           }
 
+          const rawSlice = text.slice(rawStart, rawEnd);
           matches.push({
             ruleId: rule.id,
             rawStart,
@@ -243,7 +245,36 @@
     return selected.sort((left, right) => left.rawStart - right.rawStart);
   }
 
-  function isWordLikeMatch(rawSlice) {
+  function compileRules() {
+    const compiled = [];
+    for (const rule of state.bundle.dictionary || []) {
+      if (!shouldUseRule(rule.severity, state.settings.strictness)) {
+        continue;
+      }
+
+      compiled.push({
+        id: rule.id,
+        replacement: rule.replacement,
+        allowMultiword: Boolean(rule.allowMultiword),
+        regexes: (rule.patterns || []).flatMap((pattern) => {
+          try {
+            return [new RegExp(pattern, "giu")];
+          } catch (error) {
+            return [];
+          }
+        })
+      });
+    }
+
+    return compiled;
+  }
+
+  function isWordLikeMatch(rawText, rawStart, rawEnd, rule) {
+    if (!hasTokenBoundaries(rawText, rawStart, rawEnd)) {
+      return false;
+    }
+
+    const rawSlice = String(rawText || "").slice(rawStart, rawEnd);
     const chunks = String(rawSlice || "")
       .split(/[^\p{L}\p{N}]+/u)
       .filter(Boolean);
@@ -252,7 +283,39 @@
       return true;
     }
 
+    if (rule?.allowMultiword) {
+      return isReasonableMultiwordMatch(rawSlice, chunks);
+    }
+
     return chunks.every((chunk) => chunk.length <= 2);
+  }
+
+  function isReasonableMultiwordMatch(rawSlice, chunks) {
+    if (!rawSlice || rawSlice.length > 180) {
+      return false;
+    }
+
+    if (chunks.length > 10) {
+      return false;
+    }
+
+    const longChunks = chunks.filter((chunk) => chunk.length >= 3);
+    if (longChunks.length === 0) {
+      return false;
+    }
+
+    return longChunks.join("").length >= 4;
+  }
+
+  function hasTokenBoundaries(rawText, rawStart, rawEnd) {
+    const input = String(rawText || "");
+    const previous = rawStart > 0 ? input[rawStart - 1] : "";
+    const next = rawEnd < input.length ? input[rawEnd] : "";
+    return !isLetterOrDigit(previous) && !isLetterOrDigit(next);
+  }
+
+  function isLetterOrDigit(character) {
+    return Boolean(character) && /[\p{L}\p{N}]/u.test(character);
   }
 
   function getReplacement(rule, originalSlice) {

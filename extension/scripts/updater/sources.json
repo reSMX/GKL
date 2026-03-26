@@ -1,4 +1,9 @@
 {
+  "manual_profane_terms": {
+    "path": "data/manual-profanity.txt",
+    "severity": "high",
+    "replacement": "грубое выражение"
+  },
   "rkn_registry": {
     "enabled": false,
     "source": "data/rkn-export.sample.xml",
@@ -8,9 +13,22 @@
   },
   "blocked_sites": [
     {
+      "path": "https://raw.githubusercontent.com/1andrevich/Re-filter-lists/main/domains_all.lst",
+      "type": "domain",
+      "source": "refilter_lists_domains",
+      "note": "Еженедельно подтягивается из Re-filter-lists."
+    },
+    {
+      "path": "data/adult-static.txt",
+      "type": "domain",
+      "source": "static_adult_domains",
+      "note": "Постоянный локальный список популярных adult-доменов."
+    },
+    {
       "path": "data/blocked-sites.txt",
       "type": "domain",
-      "source": "demo_registry"
+      "source": "manual_extra_blocked",
+      "note": "Ручные дополнительные домены проекта."
     }
   ],
   "dictionary": [

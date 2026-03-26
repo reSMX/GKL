@@ -1,0 +1,12 @@
+# Постоянная локальная часть списка adult-доменов.
+# Список намеренно короткий и стабильный: эти домены добавляются к weekly-списку всегда.
+brazzers.com
+pornhub.com
+redtube.com
+spankbang.com
+tube8.com
+xhamster.com
+xnxx.com
+xvideos.com
+youporn.com
+youjizz.com

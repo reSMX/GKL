@@ -1,2 +1,2 @@
-demo-danger.invalid
-registry-test.invalid
+# Дополнительные домены, которые вы хотите блокировать вручную.
+# По умолчанию файл пустой: основной weekly-список приходит из Re-filter-lists.

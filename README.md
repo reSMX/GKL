@@ -9,6 +9,10 @@
 - страницу `options` с настройками строгости, режима замены, доверенных сайтов, пользовательских исключений и источника данных;
 - локальный `default-bundle.json` как кэш и аварийный fallback;
 - автоматическую загрузку основного bundle-файла из GitHub Raw через `source-config.json`;
+- weekly-обновление bundle через GitHub Actions;
+- upstream-домены из `1andrevich/Re-filter-lists`;
+- постоянный локальный список популярных adult-доменов;
+- ручной неизменяемый список матерных слов и форм, собранный из пользовательского списка;
 - скрипт сборки bundle и отдельный парсер выгрузки РКН.
 
 ## Структура
@@ -18,7 +22,10 @@
 - `extension/content-script.js` — фильтрация текстовых узлов и наблюдение за динамическим контентом.
 - `extension/data/source-config.json` — конфиг GitHub Raw источника.
 - `extension/data/default-bundle.json` — локальный fallback-кэш.
+- `extension/scripts/updater/data/adult-static.txt` — постоянная adult-часть блокировок.
+- `extension/scripts/updater/data/manual-profanity.txt` — ручной неизменяемый источник обсценной лексики.
 - `extension/scripts/updater/configure_github_source.py` — генератор `source-config.json`.
+- `.github/workflows/update-bundle.yml` — еженедельная автоматическая сборка bundle.
 - `extension/scripts/updater/fetch_rkn_registry.py` — парсер выгрузки РКН.
 - `extension/scripts/updater/build_bundle.py` — сборка итогового bundle JSON.
 
@@ -86,6 +93,15 @@ py extension\scripts\updater\fetch_rkn_registry.py `
 
 - расширение получает уже готовый bundle из GitHub Raw;
 - парсер умеет разобрать официальную выгрузку РКН после того, как она получена из доступного вам канала.
+
+## Автоматическое weekly-обновление
+
+После `git push` workflow `.github/workflows/update-bundle.yml` будет каждую неделю:
+
+- скачивать свежий `domains_all.lst` из `1andrevich/Re-filter-lists`;
+- добавлять постоянный список из `adult-static.txt`;
+- собирать новый `extension/data/default-bundle.json`;
+- коммитить обновление обратно в ваш репозиторий.
 
 ## Что уже готово
 

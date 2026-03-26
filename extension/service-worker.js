@@ -382,6 +382,7 @@ async function resolveBundleSource(settings) {
 
 async function loadBundle(source) {
   const checkedAt = new Date().toISOString();
+  const localBundle = await loadBundledFallbackBundle(checkedAt);
 
   if (source.url) {
     try {
@@ -391,10 +392,10 @@ async function loadBundle(source) {
       }
 
       const payload = await response.json();
-      const bundle = normalizeBundle(payload);
-      bundle.metadata.checkedAt = checkedAt;
-      bundle.metadata.sourceLabel = source.url;
-      return bundle;
+      const remoteBundle = normalizeBundle(payload);
+      remoteBundle.metadata.checkedAt = checkedAt;
+      remoteBundle.metadata.sourceLabel = source.url;
+      return mergeRemoteBundle(remoteBundle, localBundle);
     } catch (error) {
       await appendUpdateHistory({
         checkedAt,
@@ -405,12 +406,33 @@ async function loadBundle(source) {
     }
   }
 
+  return localBundle;
+}
+
+async function loadBundledFallbackBundle(checkedAt) {
   const localResponse = await fetch(chrome.runtime.getURL("data/default-bundle.json"), { cache: "no-store" });
   const localPayload = await localResponse.json();
   const bundle = normalizeBundle(localPayload);
   bundle.metadata.checkedAt = checkedAt;
   bundle.metadata.sourceLabel = "bundled-default";
   return bundle;
+}
+
+function mergeRemoteBundle(remoteBundle, localBundle) {
+  const merged = normalizeBundle({
+    ...remoteBundle,
+    dictionary: (localBundle.dictionary || []).length > 0 ? localBundle.dictionary : remoteBundle.dictionary,
+    exceptions: (localBundle.exceptions || []).length > 0 ? localBundle.exceptions : remoteBundle.exceptions
+  });
+
+  merged.metadata.checkedAt = remoteBundle.metadata?.checkedAt || localBundle.metadata?.checkedAt || null;
+  merged.metadata.sourceLabel = remoteBundle.metadata?.sourceLabel || localBundle.metadata?.sourceLabel || "unknown";
+  merged.metadata.notes = [
+    remoteBundle.metadata?.notes || "",
+    "Локальные словарь и исключения применены поверх удалённого списка сайтов."
+  ].filter(Boolean).join(" ");
+
+  return merged;
 }
 
 async function getUpdateHistory() {

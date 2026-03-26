@@ -1,0 +1,23 @@
+[
+  {
+    "type": "domain",
+    "value": "demo-danger.invalid",
+    "id": "rkn_sample-1",
+    "source": "rkn_sample",
+    "note": "Получено из выгрузки официального реестра РКН."
+  },
+  {
+    "type": "url-contains",
+    "value": "blocked-zone.example/test",
+    "id": "rkn_sample-2",
+    "source": "rkn_sample",
+    "note": "Получено из выгрузки официального реестра РКН."
+  },
+  {
+    "type": "domain",
+    "value": "registry-test.invalid",
+    "id": "rkn_sample-3",
+    "source": "rkn_sample",
+    "note": "Получено из выгрузки официального реестра РКН."
+  }
+]

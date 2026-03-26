@@ -221,6 +221,7 @@ def load_dictionary(config: dict) -> list[dict]:
                 "lemma": "Ручной неизменяемый словарь матов проекта",
                 "severity": source_config.get("severity", "medium"),
                 "replacement": source_config.get("replacement", "грубое выражение"),
+                "terms": terms,
                 "patterns": [make_exact_term_pattern(term) for term in terms]
             })
 

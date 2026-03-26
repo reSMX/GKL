@@ -222,11 +222,14 @@
               severity: String(entry.severity || "medium"),
               replacement: String(entry.replacement || "нежелательное выражение"),
               allowMultiword: Boolean(entry.allowMultiword),
+              terms: Array.isArray(entry.terms)
+                ? uniqueStrings(entry.terms.map((item) => String(item || "").trim()).filter(Boolean))
+                : [],
               patterns: Array.isArray(entry.patterns)
                 ? uniqueStrings(entry.patterns.map((item) => String(item || "").trim()).filter(Boolean))
                 : []
             }))
-            .filter((entry) => entry.patterns.length > 0)
+            .filter((entry) => entry.patterns.length > 0 || entry.terms.length > 0)
         : [],
       exceptions: Array.isArray(input.exceptions)
         ? uniqueStrings(input.exceptions.map((entry) => String(entry || "").trim().toLowerCase()).filter(Boolean))

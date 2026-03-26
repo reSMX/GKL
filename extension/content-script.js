@@ -4,16 +4,25 @@
   }
 
   const {
-    normalizeTextWithMap,
     normalizeToken,
     shouldUseRule,
     shouldSkipTextNode
   } = globalThis.CenzControlShared;
+  const TOKEN_SCAN_RE = /[\p{L}\p{N}@]+/gu;
+  const SEVERITY_SCORE = {
+    low: 1,
+    medium: 2,
+    high: 3
+  };
 
   const state = {
     settings: null,
     bundle: null,
-    compiledRules: [],
+    compiledRules: {
+      exactRules: new Map(),
+      regexRules: []
+    },
+    exceptionTokens: new Set(),
     isTrusted: false,
     replacedCount: 0,
     scannedNodes: 0,
@@ -65,6 +74,7 @@
     state.settings = response.settings;
     state.bundle = response.bundle;
     state.isTrusted = response.isTrusted;
+    state.exceptionTokens = collectExceptionTokens();
     state.compiledRules = compileRules();
 
     if (!state.settings.filteringEnabled || state.isTrusted) {
@@ -169,186 +179,147 @@
   }
 
   function transformText(text) {
-    const scan = normalizeTextWithMap(text);
-    if (!scan.normalized || scan.normalized.length < 3) {
-      return null;
-    }
-
-    const exceptionRanges = collectExceptionRanges(scan.normalized);
-    const matches = [];
-
-    for (const rule of state.compiledRules) {
-      for (const regex of rule.regexes) {
-        for (const match of scan.normalized.matchAll(regex)) {
-          const matchedText = match[0];
-          if (!matchedText) {
-            continue;
-          }
-
-          const normStart = Number(match.index);
-          const normEnd = normStart + matchedText.length;
-          if (isInsideException(normStart, normEnd, exceptionRanges)) {
-            continue;
-          }
-
-          const rawStart = scan.positions[normStart];
-          const rawEnd = scan.positions[normEnd - 1] + 1;
-          if (!Number.isInteger(rawStart) || !Number.isInteger(rawEnd)) {
-            continue;
-          }
-
-          if (!isWordLikeMatch(text, rawStart, rawEnd, rule)) {
-            continue;
-          }
-
-          const rawSlice = text.slice(rawStart, rawEnd);
-          matches.push({
-            ruleId: rule.id,
-            rawStart,
-            rawEnd,
-            replacement: getReplacement(rule, rawSlice)
-          });
-        }
-      }
-    }
-
-    const finalMatches = compactMatches(matches);
-    if (finalMatches.length === 0) {
+    const matches = collectTokenMatches(text);
+    if (matches.length === 0) {
       return null;
     }
 
     let output = text;
     const ruleHits = {};
-    for (const match of [...finalMatches].sort((left, right) => right.rawStart - left.rawStart)) {
+    for (const match of [...matches].sort((left, right) => right.rawStart - left.rawStart)) {
       output = `${output.slice(0, match.rawStart)}${match.replacement}${output.slice(match.rawEnd)}`;
       ruleHits[match.ruleId] = (ruleHits[match.ruleId] || 0) + 1;
     }
 
     return {
       text: output,
-      matchCount: finalMatches.length,
+      matchCount: matches.length,
       ruleHits
     };
   }
 
-  function collectExceptionRanges(normalizedText) {
-    const ranges = [];
+  function collectExceptionTokens() {
     const customExceptions = state.settings.customExceptions || [];
-    const combined = [...(state.bundle.exceptions || []), ...customExceptions].map((item) => normalizeToken(item)).filter(Boolean);
-
-    for (const exception of combined) {
-      const escaped = exception.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const regex = new RegExp(escaped, "giu");
-      for (const match of normalizedText.matchAll(regex)) {
-        if (!match[0]) {
-          continue;
-        }
-        ranges.push({
-          start: Number(match.index),
-          end: Number(match.index) + match[0].length
-        });
-      }
-    }
-
-    return ranges;
-  }
-
-  function isInsideException(start, end, ranges) {
-    return ranges.some((range) => start >= range.start && end <= range.end);
-  }
-
-  function compactMatches(matches) {
-    const sorted = [...matches].sort((left, right) => {
-      const leftLength = left.rawEnd - left.rawStart;
-      const rightLength = right.rawEnd - right.rawStart;
-      if (rightLength !== leftLength) {
-        return rightLength - leftLength;
-      }
-      return left.rawStart - right.rawStart;
-    });
-
-    const selected = [];
-    for (const candidate of sorted) {
-      const overlaps = selected.some((item) => !(candidate.rawEnd <= item.rawStart || candidate.rawStart >= item.rawEnd));
-      if (!overlaps) {
-        selected.push(candidate);
-      }
-    }
-
-    return selected.sort((left, right) => left.rawStart - right.rawStart);
+    return new Set(
+      [...(state.bundle.exceptions || []), ...customExceptions]
+        .map((item) => canonicalizeToken(item))
+        .filter(Boolean)
+    );
   }
 
   function compileRules() {
-    const compiled = [];
-    for (const rule of state.bundle.dictionary || []) {
+    const exactRules = new Map();
+    const regexRules = [];
+
+    for (const [index, rule] of (state.bundle.dictionary || []).entries()) {
       if (!shouldUseRule(rule.severity, state.settings.strictness)) {
         continue;
       }
 
-      compiled.push({
+      const descriptor = {
         id: rule.id,
+        severity: rule.severity,
         replacement: rule.replacement,
-        allowMultiword: Boolean(rule.allowMultiword),
-        regexes: (rule.patterns || []).flatMap((pattern) => {
+        priority: index
+      };
+      const exactTerms = (rule.terms || [])
+        .map((term) => canonicalizeToken(term))
+        .filter(Boolean);
+
+      for (const term of exactTerms) {
+        const current = exactRules.get(term);
+        if (!current || isRuleHigherPriority(descriptor, current)) {
+          exactRules.set(term, descriptor);
+        }
+      }
+
+      if (exactTerms.length === 0) {
+        const regexes = (rule.patterns || []).flatMap((pattern) => {
           try {
-            return [new RegExp(pattern, "giu")];
+            return [new RegExp(`^(?:${pattern})$`, "iu")];
           } catch (error) {
             return [];
           }
-        })
+        });
+
+        if (regexes.length > 0) {
+          regexRules.push({
+            ...descriptor,
+            regexes
+          });
+        }
+      }
+    }
+
+    return {
+      exactRules,
+      regexRules
+    };
+  }
+
+  function collectTokenMatches(text) {
+    const matches = [];
+    for (const tokenMatch of String(text || "").matchAll(new RegExp(TOKEN_SCAN_RE))) {
+      const rawToken = tokenMatch[0];
+      if (!rawToken) {
+        continue;
+      }
+
+      const rawStart = Number(tokenMatch.index);
+      const rawEnd = rawStart + rawToken.length;
+      const canonicalToken = canonicalizeToken(rawToken);
+      if (!canonicalToken) {
+        continue;
+      }
+
+      if (state.exceptionTokens.has(canonicalToken)) {
+        continue;
+      }
+
+      const rule = findRuleForToken(canonicalToken);
+      if (!rule) {
+        continue;
+      }
+
+      matches.push({
+        ruleId: rule.id,
+        rawStart,
+        rawEnd,
+        replacement: getReplacement(rule, rawToken)
       });
     }
 
-    return compiled;
+    return matches;
   }
 
-  function isWordLikeMatch(rawText, rawStart, rawEnd, rule) {
-    if (!hasTokenBoundaries(rawText, rawStart, rawEnd)) {
-      return false;
+  function findRuleForToken(token) {
+    if (state.compiledRules.exactRules.has(token)) {
+      return state.compiledRules.exactRules.get(token);
     }
 
-    const rawSlice = String(rawText || "").slice(rawStart, rawEnd);
-    const chunks = String(rawSlice || "")
-      .split(/[^\p{L}\p{N}]+/u)
-      .filter(Boolean);
-
-    if (chunks.length <= 1) {
-      return true;
+    for (const rule of state.compiledRules.regexRules) {
+      for (const regex of rule.regexes) {
+        if (regex.test(token)) {
+          return rule;
+        }
+      }
     }
 
-    if (rule?.allowMultiword) {
-      return isReasonableMultiwordMatch(rawSlice, chunks);
-    }
-
-    return chunks.every((chunk) => chunk.length <= 2);
+    return null;
   }
 
-  function isReasonableMultiwordMatch(rawSlice, chunks) {
-    if (!rawSlice || rawSlice.length > 180) {
-      return false;
+  function isRuleHigherPriority(candidate, current) {
+    const candidateSeverity = SEVERITY_SCORE[candidate.severity] || SEVERITY_SCORE.medium;
+    const currentSeverity = SEVERITY_SCORE[current.severity] || SEVERITY_SCORE.medium;
+    if (candidateSeverity !== currentSeverity) {
+      return candidateSeverity > currentSeverity;
     }
 
-    if (chunks.length > 10) {
-      return false;
-    }
-
-    const longChunks = chunks.filter((chunk) => chunk.length >= 3);
-    if (longChunks.length === 0) {
-      return false;
-    }
-
-    return longChunks.join("").length >= 4;
+    return candidate.priority < current.priority;
   }
 
-  function hasTokenBoundaries(rawText, rawStart, rawEnd) {
-    const input = String(rawText || "");
-    const previous = rawStart > 0 ? input[rawStart - 1] : "";
-    const next = rawEnd < input.length ? input[rawEnd] : "";
-    return !isLetterOrDigit(previous) && !isLetterOrDigit(next);
-  }
-
-  function isLetterOrDigit(character) {
-    return Boolean(character) && /[\p{L}\p{N}]/u.test(character);
+  function canonicalizeToken(value) {
+    return normalizeToken(value).replaceAll("ё", "е");
   }
 
   function getReplacement(rule, originalSlice) {

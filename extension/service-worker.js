@@ -22,6 +22,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   chrome.alarms.create("cc-refresh-data", {
     periodInMinutes: DEFAULT_SETTINGS.autoUpdateHours * 60
   });
+  await chrome.storage.local.remove(STORAGE_KEYS.dataBundle);
   await ensureSettings();
   await ensureBundleLoaded({ forceRefresh: true });
   await reinjectContentScripts();
@@ -31,6 +32,7 @@ chrome.runtime.onStartup.addListener(async () => {
   chrome.alarms.create("cc-refresh-data", {
     periodInMinutes: DEFAULT_SETTINGS.autoUpdateHours * 60
   });
+  await chrome.storage.local.remove(STORAGE_KEYS.dataBundle);
   await ensureSettings();
   await ensureBundleLoaded({ forceRefresh: false });
   await reinjectContentScripts();
@@ -78,7 +80,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           ok: true,
           settings,
-          bundle,
+          bundle: createFilteringBundle(bundle),
           isTrusted: isTrustedHost(hostname, settings.trustedSites)
         });
         return;
@@ -260,23 +262,12 @@ async function ensureBundleLoaded(options) {
     return activeBundle;
   }
 
-  const stored = await chrome.storage.local.get(STORAGE_KEYS.dataBundle);
-  if (stored[STORAGE_KEYS.dataBundle]) {
-    setActiveBundle(normalizeBundle(stored[STORAGE_KEYS.dataBundle]));
-  }
-
-  if (activeBundle && !forceRefresh) {
-    return activeBundle;
-  }
+  await chrome.storage.local.remove(STORAGE_KEYS.dataBundle);
 
   const settings = await getSettings();
   const source = await resolveBundleSource(settings);
   const bundle = await loadBundle(source);
   setActiveBundle(bundle);
-
-  await chrome.storage.local.set({
-    [STORAGE_KEYS.dataBundle]: bundle
-  });
 
   await appendUpdateHistory({
     checkedAt: new Date().toISOString(),
@@ -328,6 +319,16 @@ function normalizeSourceConfig(payload) {
 function setActiveBundle(bundle) {
   activeBundle = bundle;
   activeBundleIndex = createBundleIndex(bundle);
+}
+
+function createFilteringBundle(bundle) {
+  return {
+    version: bundle.version,
+    updatedAt: bundle.updatedAt,
+    metadata: bundle.metadata,
+    dictionary: bundle.dictionary || [],
+    exceptions: bundle.exceptions || []
+  };
 }
 
 function createBundleIndex(bundle) {

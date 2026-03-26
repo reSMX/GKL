@@ -93,18 +93,30 @@
     }
 
     state.observer = new MutationObserver((mutations) => {
+      if (!hasRuntimeAccess()) {
+        deactivateExtensionContext();
+        return;
+      }
+
       if (state.applying) {
         return;
       }
 
-      for (const mutation of mutations) {
-        if (mutation.type === "characterData" && mutation.target.nodeType === Node.TEXT_NODE) {
-          processTextNode(mutation.target);
-          continue;
-        }
+      try {
+        for (const mutation of mutations) {
+          if (mutation.type === "characterData" && mutation.target.nodeType === Node.TEXT_NODE) {
+            processTextNode(mutation.target);
+            continue;
+          }
 
-        for (const addedNode of mutation.addedNodes) {
-          processRoot(addedNode);
+          for (const addedNode of mutation.addedNodes) {
+            processRoot(addedNode);
+          }
+        }
+      } catch (error) {
+        if (isExtensionContextInvalidatedError(error)) {
+          deactivateExtensionContext();
+          return;
         }
       }
 
@@ -120,6 +132,11 @@
 
   function processRoot(root) {
     if (!state.extensionAlive) {
+      return;
+    }
+
+    if (!hasRuntimeAccess()) {
+      deactivateExtensionContext();
       return;
     }
 
@@ -148,6 +165,11 @@
       return;
     }
 
+    if (!hasRuntimeAccess()) {
+      deactivateExtensionContext();
+      return;
+    }
+
     if (shouldSkipTextNode(node)) {
       return;
     }
@@ -162,6 +184,9 @@
     try {
       transformed = transformText(originalText);
     } catch (error) {
+      if (isExtensionContextInvalidatedError(error)) {
+        deactivateExtensionContext();
+      }
       return;
     }
     if (!transformed || transformed.text === originalText) {
@@ -179,6 +204,11 @@
   }
 
   function transformText(text) {
+    if (!state.extensionAlive || !hasRuntimeAccess()) {
+      deactivateExtensionContext();
+      return null;
+    }
+
     const matches = collectTokenMatches(text);
     if (matches.length === 0) {
       return null;
@@ -199,6 +229,11 @@
   }
 
   function collectExceptionTokens() {
+    if (!state.extensionAlive || !hasRuntimeAccess()) {
+      deactivateExtensionContext();
+      return new Set();
+    }
+
     const customExceptions = state.settings.customExceptions || [];
     return new Set(
       [...(state.bundle.exceptions || []), ...customExceptions]
@@ -208,6 +243,14 @@
   }
 
   function compileRules() {
+    if (!state.extensionAlive || !hasRuntimeAccess()) {
+      deactivateExtensionContext();
+      return {
+        exactRules: new Map(),
+        regexRules: []
+      };
+    }
+
     const exactRules = new Map();
     const regexRules = [];
 
@@ -258,6 +301,11 @@
   }
 
   function collectTokenMatches(text) {
+    if (!state.extensionAlive || !hasRuntimeAccess()) {
+      deactivateExtensionContext();
+      return [];
+    }
+
     const matches = [];
     for (const tokenMatch of String(text || "").matchAll(new RegExp(TOKEN_SCAN_RE))) {
       const rawToken = tokenMatch[0];
@@ -343,6 +391,11 @@
 
     window.clearTimeout(state.reportTimer);
     state.reportTimer = window.setTimeout(() => {
+      if (!hasRuntimeAccess()) {
+        deactivateExtensionContext();
+        return;
+      }
+
       void safeSendMessage({
         type: "cc:reportStats",
         url: location.href,

@@ -25,12 +25,28 @@
     extensionAlive: true
   };
 
+  window.addEventListener("error", (event) => {
+    if (isExtensionContextInvalidatedError(event.error || event.message)) {
+      event.preventDefault();
+      deactivateExtensionContext();
+    }
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    if (isExtensionContextInvalidatedError(event.reason)) {
+      event.preventDefault();
+      deactivateExtensionContext();
+    }
+  });
+
   if (!/^https?:/i.test(location.protocol)) {
     return;
   }
 
-  init().catch(() => {
-    /* ignore page-side failures */
+  init().catch((error) => {
+    if (isExtensionContextInvalidatedError(error)) {
+      deactivateExtensionContext();
+    }
   });
 
   async function init() {
@@ -294,9 +310,14 @@
     }
 
     try {
+      if (!hasRuntimeAccess()) {
+        deactivateExtensionContext();
+        return null;
+      }
+
       return await chrome.runtime.sendMessage(payload);
     } catch (error) {
-      if (String(error?.message || error).includes("Extension context invalidated")) {
+      if (isExtensionContextInvalidatedError(error)) {
         deactivateExtensionContext();
         return null;
       }
@@ -306,11 +327,27 @@
   }
 
   function deactivateExtensionContext() {
+    if (!state.extensionAlive) {
+      return;
+    }
+
     state.extensionAlive = false;
     window.clearTimeout(state.reportTimer);
     if (state.observer) {
       state.observer.disconnect();
       state.observer = null;
     }
+  }
+
+  function hasRuntimeAccess() {
+    try {
+      return Boolean(chrome?.runtime?.id);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function isExtensionContextInvalidatedError(error) {
+    return String(error?.message || error || "").includes("Extension context invalidated");
   }
 })();

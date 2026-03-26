@@ -3,9 +3,7 @@
     settings: "cc:settings",
     dataBundle: "cc:dataBundle",
     updateHistory: "cc:updateHistory",
-    pageStats: "cc:pageStats",
-    parentalControl: "cc:parentalControl",
-    settingsUnlocked: "cc:settingsUnlocked"
+    pageStats: "cc:pageStats"
   };
 
   const DEFAULT_SETTINGS = {

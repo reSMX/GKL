@@ -13,9 +13,6 @@ const {
 
 const pageStatsByTab = new Map();
 const SOURCE_CONFIG_PATH = "data/source-config.json";
-const PASSWORD_MIN_LENGTH = 4;
-const PASSWORD_HASH_ITERATIONS = 120000;
-const textEncoder = new TextEncoder();
 
 let activeBundle = null;
 let sourceConfigCache = null;
@@ -115,7 +112,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const url = String(message.url || "");
         const settings = await getSettings();
         const bundle = await ensureBundleLoaded({ forceRefresh: false });
-        const lock = await getSettingsLockState();
         const decision = await evaluateUrl(url, settings, bundle);
         const stats = Number.isFinite(tabId) ? pageStatsByTab.get(tabId) || null : null;
         const resolvedSource = await resolveBundleSource(settings);
@@ -123,7 +119,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           ok: true,
           settings,
-          lock,
           bundleMeta: {
             version: bundle.version,
             updatedAt: bundle.updatedAt,
@@ -144,12 +139,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const updateHistory = await getUpdateHistory();
         const sourceConfig = await getSourceConfig(false);
         const resolvedSource = await resolveBundleSource(settings);
-        const lock = await getSettingsLockState();
 
         sendResponse({
           ok: true,
           settings,
-          lock,
           sourceConfig,
           bundleMeta: {
             version: bundle.version,
@@ -168,34 +161,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       case "cc:saveOptions": {
-        if (!(await canManageSettings())) {
-          sendResponse({ ok: false, error: "Настройки защищены родительским паролем." });
-          return;
-        }
-
         const settings = await saveSettings(message.settings || {});
         sendResponse({ ok: true, settings });
-        return;
-      }
-
-      case "cc:unlockSettings": {
-        sendResponse(await unlockSettingsSession(message.password || ""));
-        return;
-      }
-
-      case "cc:lockSettings": {
-        await setSettingsUnlocked(false);
-        sendResponse({ ok: true, lock: await getSettingsLockState() });
-        return;
-      }
-
-      case "cc:setSettingsPassword": {
-        sendResponse(await setSettingsPassword(message.currentPassword || "", message.newPassword || ""));
-        return;
-      }
-
-      case "cc:clearSettingsPassword": {
-        sendResponse(await clearSettingsPassword(message.currentPassword || ""));
         return;
       }
 
@@ -286,207 +253,6 @@ function sanitizeSettings(candidateSettings) {
   settings.autoUpdateHours = Number(settings.autoUpdateHours) > 0 ? Number(settings.autoUpdateHours) : DEFAULT_SETTINGS.autoUpdateHours;
 
   return settings;
-}
-
-async function getParentalControl() {
-  const stored = await chrome.storage.local.get(STORAGE_KEYS.parentalControl);
-  return normalizeParentalControl(stored[STORAGE_KEYS.parentalControl]);
-}
-
-function normalizeParentalControl(candidate) {
-  const input = candidate && typeof candidate === "object" ? candidate : {};
-
-  return {
-    passwordHash: String(input.passwordHash || "").trim(),
-    passwordSalt: String(input.passwordSalt || "").trim(),
-    updatedAt: input.updatedAt || null
-  };
-}
-
-async function getSettingsLockState() {
-  const parentalControl = await getParentalControl();
-  const enabled = Boolean(parentalControl.passwordHash && parentalControl.passwordSalt);
-  if (!enabled) {
-    return {
-      enabled: false,
-      unlocked: true,
-      updatedAt: parentalControl.updatedAt
-    };
-  }
-
-  const stored = await chrome.storage.session.get(STORAGE_KEYS.settingsUnlocked);
-  return {
-    enabled: true,
-    unlocked: Boolean(stored[STORAGE_KEYS.settingsUnlocked]),
-    updatedAt: parentalControl.updatedAt
-  };
-}
-
-async function canManageSettings() {
-  const lock = await getSettingsLockState();
-  return !lock.enabled || lock.unlocked;
-}
-
-async function setSettingsUnlocked(unlocked) {
-  if (unlocked) {
-    await chrome.storage.session.set({
-      [STORAGE_KEYS.settingsUnlocked]: true
-    });
-    return;
-  }
-
-  await chrome.storage.session.remove(STORAGE_KEYS.settingsUnlocked);
-}
-
-async function unlockSettingsSession(password) {
-  const parentalControl = await getParentalControl();
-  if (!parentalControl.passwordHash || !parentalControl.passwordSalt) {
-    await setSettingsUnlocked(true);
-    return {
-      ok: true,
-      lock: await getSettingsLockState()
-    };
-  }
-
-  const isValid = await verifyPassword(password, parentalControl);
-  if (!isValid) {
-    return {
-      ok: false,
-      error: "Неверный пароль."
-    };
-  }
-
-  await setSettingsUnlocked(true);
-  return {
-    ok: true,
-    lock: await getSettingsLockState()
-  };
-}
-
-async function setSettingsPassword(currentPassword, newPassword) {
-  const password = String(newPassword || "");
-  if (password.length < PASSWORD_MIN_LENGTH) {
-    return {
-      ok: false,
-      error: `Пароль должен содержать минимум ${PASSWORD_MIN_LENGTH} символа.`
-    };
-  }
-
-  const parentalControl = await getParentalControl();
-  const alreadyProtected = Boolean(parentalControl.passwordHash && parentalControl.passwordSalt);
-  if (alreadyProtected) {
-    const canChange = await canManageSettings();
-    if (!canChange) {
-      return {
-        ok: false,
-        error: "Сначала разблокируйте настройки текущим паролем."
-      };
-    }
-
-    if (!currentPassword || !(await verifyPassword(currentPassword, parentalControl))) {
-      return {
-        ok: false,
-        error: "Текущий пароль указан неверно."
-      };
-    }
-  }
-
-  const passwordSalt = generateSaltHex();
-  const passwordHash = await derivePasswordHash(password, passwordSalt);
-  await chrome.storage.local.set({
-    [STORAGE_KEYS.parentalControl]: {
-      passwordHash,
-      passwordSalt,
-      updatedAt: new Date().toISOString()
-    }
-  });
-  await setSettingsUnlocked(true);
-
-  return {
-    ok: true,
-    lock: await getSettingsLockState()
-  };
-}
-
-async function clearSettingsPassword(currentPassword) {
-  const parentalControl = await getParentalControl();
-  if (!parentalControl.passwordHash || !parentalControl.passwordSalt) {
-    return {
-      ok: true,
-      lock: await getSettingsLockState()
-    };
-  }
-
-  const canChange = await canManageSettings();
-  if (!canChange) {
-    return {
-      ok: false,
-      error: "Сначала разблокируйте настройки текущим паролем."
-    };
-  }
-
-  if (!currentPassword || !(await verifyPassword(currentPassword, parentalControl))) {
-    return {
-      ok: false,
-      error: "Текущий пароль указан неверно."
-    };
-  }
-
-  await chrome.storage.local.remove(STORAGE_KEYS.parentalControl);
-  await setSettingsUnlocked(false);
-
-  return {
-    ok: true,
-    lock: await getSettingsLockState()
-  };
-}
-
-async function verifyPassword(password, parentalControl) {
-  if (!password || !parentalControl.passwordHash || !parentalControl.passwordSalt) {
-    return false;
-  }
-
-  const candidateHash = await derivePasswordHash(password, parentalControl.passwordSalt);
-  return candidateHash === parentalControl.passwordHash;
-}
-
-function generateSaltHex() {
-  return bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
-}
-
-async function derivePasswordHash(password, saltHex) {
-  const baseKey = await crypto.subtle.importKey(
-    "raw",
-    textEncoder.encode(String(password || "")),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      hash: "SHA-256",
-      salt: hexToBytes(saltHex),
-      iterations: PASSWORD_HASH_ITERATIONS
-    },
-    baseKey,
-    256
-  );
-
-  return bytesToHex(new Uint8Array(derivedBits));
-}
-
-function bytesToHex(bytes) {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function hexToBytes(hex) {
-  const normalized = String(hex || "").trim();
-  const bytes = new Uint8Array(normalized.length / 2);
-  for (let index = 0; index < normalized.length; index += 2) {
-    bytes[index / 2] = Number.parseInt(normalized.slice(index, index + 2), 16);
-  }
-  return bytes;
 }
 
 async function ensureBundleLoaded(options) {

@@ -1,8 +1,7 @@
 (() => {
-  if (globalThis.__cenzControlContentScriptLoaded) {
-    return;
+  if (globalThis.__cenzControlContentScriptController?.deactivate) {
+    globalThis.__cenzControlContentScriptController.deactivate();
   }
-  globalThis.__cenzControlContentScriptLoaded = true;
 
   const {
     normalizeToken,
@@ -24,20 +23,24 @@
     reportTimer: null,
     extensionAlive: true
   };
+  const abortController = new AbortController();
+  globalThis.__cenzControlContentScriptController = {
+    deactivate: () => deactivateExtensionContext()
+  };
 
   window.addEventListener("error", (event) => {
     if (isExtensionContextInvalidatedError(event.error || event.message)) {
       event.preventDefault();
       deactivateExtensionContext();
     }
-  });
+  }, { signal: abortController.signal });
 
   window.addEventListener("unhandledrejection", (event) => {
     if (isExtensionContextInvalidatedError(event.reason)) {
       event.preventDefault();
       deactivateExtensionContext();
     }
-  });
+  }, { signal: abortController.signal });
 
   if (!/^https?:/i.test(location.protocol)) {
     return;
@@ -333,9 +336,13 @@
 
     state.extensionAlive = false;
     window.clearTimeout(state.reportTimer);
+    abortController.abort();
     if (state.observer) {
       state.observer.disconnect();
       state.observer = null;
+    }
+    if (globalThis.__cenzControlContentScriptController?.deactivate === deactivateExtensionContext) {
+      delete globalThis.__cenzControlContentScriptController;
     }
   }
 

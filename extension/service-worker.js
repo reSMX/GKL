@@ -78,7 +78,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           ok: true,
           settings,
-          bundle,
+          bundle: createFilteringBundle(bundle),
           isTrusted: isTrustedHost(hostname, settings.trustedSites)
         });
         return;
@@ -315,6 +315,16 @@ function normalizeSourceConfig(payload) {
 function setActiveBundle(bundle) {
   activeBundle = bundle;
   activeBundleIndex = createBundleIndex(bundle);
+}
+
+function createFilteringBundle(bundle) {
+  return {
+    version: bundle.version,
+    updatedAt: bundle.updatedAt,
+    metadata: bundle.metadata,
+    dictionary: bundle.dictionary || [],
+    exceptions: bundle.exceptions || []
+  };
 }
 
 function createBundleIndex(bundle) {

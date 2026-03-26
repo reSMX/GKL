@@ -1,4 +1,9 @@
 (() => {
+  if (globalThis.__cenzControlContentScriptLoaded) {
+    return;
+  }
+  globalThis.__cenzControlContentScriptLoaded = true;
+
   const {
     normalizeTextWithMap,
     normalizeToken,
@@ -16,7 +21,8 @@
     ruleHits: {},
     observer: null,
     applying: false,
-    reportTimer: null
+    reportTimer: null,
+    extensionAlive: true
   };
 
   if (!/^https?:/i.test(location.protocol)) {
@@ -28,7 +34,7 @@
   });
 
   async function init() {
-    const response = await chrome.runtime.sendMessage({
+    const response = await safeSendMessage({
       type: "cc:getPageContext",
       url: location.href
     });
@@ -84,6 +90,10 @@
   }
 
   function processRoot(root) {
+    if (!state.extensionAlive) {
+      return;
+    }
+
     if (!root) {
       return;
     }
@@ -105,6 +115,10 @@
   }
 
   function processTextNode(node) {
+    if (!state.extensionAlive) {
+      return;
+    }
+
     if (shouldSkipTextNode(node)) {
       return;
     }
@@ -333,9 +347,13 @@
   }
 
   function scheduleReport() {
+    if (!state.extensionAlive) {
+      return;
+    }
+
     window.clearTimeout(state.reportTimer);
     state.reportTimer = window.setTimeout(() => {
-      void chrome.runtime.sendMessage({
+      void safeSendMessage({
         type: "cc:reportStats",
         url: location.href,
         stats: {
@@ -345,5 +363,31 @@
         }
       });
     }, 250);
+  }
+
+  async function safeSendMessage(payload) {
+    if (!state.extensionAlive) {
+      return null;
+    }
+
+    try {
+      return await chrome.runtime.sendMessage(payload);
+    } catch (error) {
+      if (String(error?.message || error).includes("Extension context invalidated")) {
+        deactivateExtensionContext();
+        return null;
+      }
+
+      return null;
+    }
+  }
+
+  function deactivateExtensionContext() {
+    state.extensionAlive = false;
+    window.clearTimeout(state.reportTimer);
+    if (state.observer) {
+      state.observer.disconnect();
+      state.observer = null;
+    }
   }
 })();

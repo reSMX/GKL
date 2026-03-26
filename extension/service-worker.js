@@ -24,6 +24,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   });
   await ensureSettings();
   await ensureBundleLoaded({ forceRefresh: true });
+  await reinjectContentScripts();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -32,6 +33,7 @@ chrome.runtime.onStartup.addListener(async () => {
   });
   await ensureSettings();
   await ensureBundleLoaded({ forceRefresh: false });
+  await reinjectContentScripts();
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
@@ -488,4 +490,19 @@ function buildBlockedPageUrl(originalUrl, entry) {
 
 function isBrowserInternalUrl(url) {
   return /^(about:|chrome:|chrome-extension:|edge:|moz-extension:|view-source:|file:)/i.test(url);
+}
+
+async function reinjectContentScripts() {
+  const tabs = await chrome.tabs.query({});
+
+  await Promise.allSettled(
+    tabs
+      .filter((tab) => typeof tab.id === "number" && tab.url && /^https?:/i.test(tab.url) && !isBrowserInternalUrl(tab.url))
+      .map((tab) =>
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["lib/shared.js", "content-script.js"]
+        })
+      )
+  );
 }

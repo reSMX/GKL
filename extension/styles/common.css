@@ -32,8 +32,12 @@ body {
 }
 
 .cc-popup {
-  min-width: 360px;
+  width: 380px;
+  min-width: 380px;
   min-height: 0;
+  max-height: 600px;
+  padding: 16px;
+  overflow: hidden;
 }
 
 .panel {
@@ -41,6 +45,13 @@ body {
   margin: 0 auto;
   display: grid;
   gap: 16px;
+}
+
+.cc-popup .panel {
+  max-width: 100%;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .panel.wide {
@@ -77,6 +88,12 @@ body {
 .card.compact {
   display: grid;
   gap: 6px;
+}
+
+.card.inset {
+  border-radius: 18px;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.62);
 }
 
 .eyebrow,
@@ -118,6 +135,10 @@ body {
   display: grid;
   gap: 8px;
   margin-top: 14px;
+}
+
+.field.compact-field {
+  margin-top: 8px;
 }
 
 .field span {
@@ -174,9 +195,19 @@ textarea {
   align-items: center;
 }
 
+.actions.stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .actions .button {
   width: auto;
   min-width: 170px;
+}
+
+.actions.stack .button {
+  width: 100%;
+  min-width: 0;
 }
 
 .status {
@@ -221,6 +252,33 @@ textarea {
   margin: 6px 0 0;
 }
 
+.hidden {
+  display: none !important;
+}
+
+.lock-card {
+  border-color: rgba(47, 125, 111, 0.28);
+}
+
+.split-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.parental-grid {
+  align-items: stretch;
+}
+
+.locked-block {
+  opacity: 0.56;
+}
+
+.source-line {
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 640px) {
   .cc-shell {
     padding: 14px;
@@ -236,7 +294,8 @@ textarea {
   }
 
   .metric-row,
-  .stat-list p {
+  .stat-list p,
+  .split-header {
     flex-direction: column;
     align-items: flex-start;
   }

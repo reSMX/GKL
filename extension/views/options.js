@@ -7,11 +7,18 @@ const {
 } = globalThis.CenzControlShared;
 
 const elements = {};
+const state = {
+  settings: deepClone(DEFAULT_SETTINGS),
+  lock: {
+    enabled: false,
+    unlocked: true
+  }
+};
 
 document.addEventListener("DOMContentLoaded", async () => {
   bindElements();
-  await loadState();
   bindActions();
+  await loadState();
 });
 
 function bindElements() {
@@ -36,25 +43,69 @@ function bindElements() {
     "saveButton",
     "refreshButton",
     "resetButton",
-    "saveStatus"
+    "saveStatus",
+    "protectedSettings",
+    "lockTitle",
+    "lockDescription",
+    "unlockCard",
+    "unlockPassword",
+    "unlockButton",
+    "lockButton",
+    "passwordCardTitle",
+    "currentPasswordField",
+    "currentPassword",
+    "newPasswordLabel",
+    "newPassword",
+    "confirmPassword",
+    "savePasswordButton",
+    "clearPasswordButton"
   ]) {
     elements[id] = document.getElementById(id);
   }
 }
 
+function bindActions() {
+  elements.saveButton.addEventListener("click", saveOptions);
+  elements.refreshButton.addEventListener("click", forceUpdate);
+  elements.resetButton.addEventListener("click", () => {
+    if (!canManageSettings()) {
+      renderStatus("Настройки защищены родительским паролем.");
+      return;
+    }
+
+    fillSettings(deepClone(DEFAULT_SETTINGS));
+    renderStatus("Значения возвращены к умолчанию. Нажмите «Сохранить настройки».");
+  });
+
+  elements.unlockButton.addEventListener("click", unlockSettings);
+  elements.lockButton.addEventListener("click", lockSettings);
+  elements.savePasswordButton.addEventListener("click", savePassword);
+  elements.clearPasswordButton.addEventListener("click", clearPassword);
+  elements.unlockPassword.addEventListener("keydown", async (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      await unlockSettings();
+    }
+  });
+}
+
 async function loadState() {
   const response = await chrome.runtime.sendMessage({ type: "cc:getOptionsState" });
   if (!response?.ok) {
-    elements.saveStatus.textContent = response?.error || "Не удалось загрузить настройки.";
+    renderStatus(response?.error || "Не удалось загрузить настройки.");
     return;
   }
 
+  state.settings = response.settings;
+  state.lock = response.lock || state.lock;
   fillSettings(response.settings);
   fillMeta(response.bundleMeta, response.updateHistory);
-  elements.saveStatus.textContent = "Настройки загружены.";
+  renderLockState();
+  renderStatus("Настройки загружены.");
 }
 
 function fillSettings(settings) {
+  state.settings = deepClone(settings);
   elements.filteringEnabled.checked = Boolean(settings.filteringEnabled);
   elements.blockingEnabled.checked = Boolean(settings.blockingEnabled);
   elements.strictness.value = settings.strictness;
@@ -95,43 +146,153 @@ function renderHistory(history) {
     .join("");
 }
 
-function bindActions() {
-  elements.saveButton.addEventListener("click", saveOptions);
-  elements.refreshButton.addEventListener("click", forceUpdate);
-  elements.resetButton.addEventListener("click", () => {
-    fillSettings(deepClone(DEFAULT_SETTINGS));
-    elements.saveStatus.textContent = "Значения возвращены к умолчанию. Нажмите «Сохранить настройки».";
+function renderLockState() {
+  const locked = state.lock.enabled && !state.lock.unlocked;
+  const passwordEnabled = Boolean(state.lock.enabled);
+
+  elements.protectedSettings.classList.toggle("locked-block", locked);
+  setProtectedControlsDisabled(locked);
+
+  elements.unlockCard.classList.toggle("hidden", !locked);
+  elements.lockButton.classList.toggle("hidden", !passwordEnabled || locked);
+  elements.currentPasswordField.classList.toggle("hidden", !passwordEnabled);
+  elements.clearPasswordButton.classList.toggle("hidden", !passwordEnabled);
+
+  if (!passwordEnabled) {
+    elements.lockTitle.textContent = "Настройки открыты";
+    elements.lockDescription.textContent = "Можно задать пароль, чтобы ребёнок не менял настройки без разрешения.";
+    elements.passwordCardTitle.textContent = "Установить пароль";
+    elements.newPasswordLabel.textContent = "Новый пароль";
+    return;
+  }
+
+  elements.passwordCardTitle.textContent = "Изменить пароль";
+  elements.newPasswordLabel.textContent = "Новый пароль";
+
+  if (locked) {
+    elements.lockTitle.textContent = "Настройки заблокированы";
+    elements.lockDescription.textContent = "Для изменения параметров сначала введите родительский пароль.";
+    return;
+  }
+
+  elements.lockTitle.textContent = "Настройки разблокированы";
+  elements.lockDescription.textContent = "Пароль активен. Изменения настроек снова можно закрыть одной кнопкой.";
+}
+
+function setProtectedControlsDisabled(disabled) {
+  for (const element of elements.protectedSettings.querySelectorAll("input, select, textarea, button")) {
+    element.disabled = disabled;
+  }
+}
+
+function canManageSettings() {
+  return !state.lock.enabled || state.lock.unlocked;
+}
+
+async function unlockSettings() {
+  const response = await chrome.runtime.sendMessage({
+    type: "cc:unlockSettings",
+    password: elements.unlockPassword.value
   });
+
+  if (!response?.ok) {
+    renderStatus(response?.error || "Не удалось разблокировать настройки.");
+    return;
+  }
+
+  state.lock = response.lock || state.lock;
+  elements.unlockPassword.value = "";
+  renderLockState();
+  renderStatus("Настройки разблокированы.");
+}
+
+async function lockSettings() {
+  const response = await chrome.runtime.sendMessage({ type: "cc:lockSettings" });
+  state.lock = response?.lock || state.lock;
+  renderLockState();
+  renderStatus("Настройки снова защищены паролем.");
+}
+
+async function savePassword() {
+  const newPassword = elements.newPassword.value;
+  const confirmPassword = elements.confirmPassword.value;
+
+  if (newPassword !== confirmPassword) {
+    renderStatus("Подтверждение пароля не совпадает.");
+    return;
+  }
+
+  const response = await chrome.runtime.sendMessage({
+    type: "cc:setSettingsPassword",
+    currentPassword: elements.currentPassword.value,
+    newPassword
+  });
+
+  if (!response?.ok) {
+    renderStatus(response?.error || "Не удалось сохранить пароль.");
+    return;
+  }
+
+  state.lock = response.lock || state.lock;
+  clearPasswordInputs();
+  renderLockState();
+  renderStatus("Пароль сохранён.");
+}
+
+async function clearPassword() {
+  const response = await chrome.runtime.sendMessage({
+    type: "cc:clearSettingsPassword",
+    currentPassword: elements.currentPassword.value
+  });
+
+  if (!response?.ok) {
+    renderStatus(response?.error || "Не удалось удалить пароль.");
+    return;
+  }
+
+  state.lock = response.lock || state.lock;
+  clearPasswordInputs();
+  renderLockState();
+  renderStatus("Пароль удалён.");
 }
 
 async function saveOptions() {
-  elements.saveStatus.textContent = "Сохранение...";
+  if (!canManageSettings()) {
+    renderStatus("Настройки защищены родительским паролем.");
+    return;
+  }
+
+  renderStatus("Сохранение...");
   const response = await chrome.runtime.sendMessage({
     type: "cc:saveOptions",
     settings: collectSettings()
   });
 
   if (!response?.ok) {
-    elements.saveStatus.textContent = response?.error || "Сохранение не удалось.";
+    renderStatus(response?.error || "Сохранение не удалось.");
     return;
   }
 
-  elements.saveStatus.textContent = "Настройки сохранены.";
+  state.settings = response.settings;
+  renderStatus("Настройки сохранены.");
 }
 
 async function forceUpdate() {
-  elements.saveStatus.textContent = "Проверка обновлений...";
+  renderStatus("Проверка обновлений...");
   const response = await chrome.runtime.sendMessage({ type: "cc:forceUpdate" });
   if (!response?.ok) {
-    elements.saveStatus.textContent = response?.error || "Обновление не удалось.";
+    renderStatus(response?.error || "Обновление не удалось.");
     return;
   }
 
   const stateResponse = await chrome.runtime.sendMessage({ type: "cc:getOptionsState" });
   if (stateResponse?.ok) {
+    state.lock = stateResponse.lock || state.lock;
     fillMeta(stateResponse.bundleMeta, stateResponse.updateHistory);
+    renderLockState();
   }
-  elements.saveStatus.textContent = "Данные обновлены.";
+
+  renderStatus("Данные обновлены.");
 }
 
 function collectSettings() {
@@ -146,4 +307,15 @@ function collectSettings() {
     trustedSites: sanitizeStringList(elements.trustedSites.value, "host"),
     customExceptions: sanitizeStringList(elements.customExceptions.value, "token")
   };
+}
+
+function clearPasswordInputs() {
+  elements.unlockPassword.value = "";
+  elements.currentPassword.value = "";
+  elements.newPassword.value = "";
+  elements.confirmPassword.value = "";
+}
+
+function renderStatus(message) {
+  elements.saveStatus.textContent = message;
 }

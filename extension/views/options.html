@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cenz Control - настройки</title>
+    <link rel="stylesheet" href="../styles/common.css">
+  </head>
+  <body class="cc-shell">
+    <main class="panel wide">
+      <section class="hero">
+        <p class="eyebrow">Настройки</p>
+        <h1>Управление фильтрацией и обновлениями</h1>
+        <p class="muted">Страница настроек объединяет оба уровня защиты: блокировку ресурсов и фильтрацию текста на разрешенных страницах.</p>
+      </section>
+
+      <section class="grid two">
+        <article class="card">
+          <h2>Режимы защиты</h2>
+          <label class="toggle">
+            <input type="checkbox" id="filteringEnabled">
+            <span>Фильтрация текста включена</span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="blockingEnabled">
+            <span>Блокировка сайтов включена</span>
+          </label>
+          <label class="field">
+            <span>Строгость</span>
+            <select id="strictness">
+              <option value="low">Низкая</option>
+              <option value="medium">Средняя</option>
+              <option value="high">Высокая</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Режим замены</span>
+            <select id="replacementMode">
+              <option value="mask">Маскировать символы</option>
+              <option value="placeholder">Полная заглушка</option>
+              <option value="soft">Нейтральная замена</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Текст заглушки</span>
+            <input id="replacementWord" type="text" placeholder="[скрыто]">
+          </label>
+        </article>
+
+        <article class="card">
+          <h2>Актуальные данные</h2>
+          <div class="stat-list">
+            <p><span>Версия:</span> <strong id="bundleVersion">-</strong></p>
+            <p><span>Обновлено:</span> <strong id="bundleUpdatedAt">-</strong></p>
+            <p><span>Проверено:</span> <strong id="bundleCheckedAt">-</strong></p>
+            <p><span>Источник:</span> <strong id="bundleSource">-</strong></p>
+            <p><span>Сайтов:</span> <strong id="blockedSitesSize">0</strong></p>
+            <p><span>Правил словаря:</span> <strong id="dictionarySize">0</strong></p>
+            <p><span>Исключений:</span> <strong id="exceptionsSize">0</strong></p>
+          </div>
+          <p class="muted">
+            Если поле ниже оставить пустым, расширение будет брать bundle из GitHub Raw URL,
+            записанного в <code>extension/data/source-config.json</code>.
+          </p>
+          <label class="field">
+            <span>URL готового bundle-файла из GitHub Raw</span>
+            <input id="remoteDataUrl" type="url" placeholder="https://raw.githubusercontent.com/owner/repo/main/extension/data/default-bundle.json">
+          </label>
+          <label class="field">
+            <span>Период автообновления, часов</span>
+            <input id="autoUpdateHours" type="number" min="1" step="1">
+          </label>
+        </article>
+      </section>
+
+      <section class="grid two">
+        <article class="card">
+          <h2>Доверенные сайты</h2>
+          <p class="muted">Каждый домен указывается с новой строки. Для таких сайтов фильтр и блокировка не применяются.</p>
+          <textarea id="trustedSites" rows="8" placeholder="school.example.ru"></textarea>
+        </article>
+
+        <article class="card">
+          <h2>Пользовательские исключения</h2>
+          <p class="muted">Слова и устойчивые выражения, которые нельзя заменять даже при совпадении с шаблоном.</p>
+          <textarea id="customExceptions" rows="8" placeholder="пример&#10;херсон"></textarea>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>История обновлений</h2>
+        <div id="updateHistory" class="history-list"></div>
+      </section>
+
+      <section class="actions">
+        <button class="button primary" id="saveButton" type="button">Сохранить настройки</button>
+        <button class="button" id="refreshButton" type="button">Проверить обновления</button>
+        <button class="button" id="resetButton" type="button">Сбросить по умолчанию</button>
+        <span class="status" id="saveStatus">Изменения не сохранены.</span>
+      </section>
+    </main>
+
+    <script src="../lib/shared.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

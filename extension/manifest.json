@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Cenz Control",
+  "version": "1.0.0",
+  "description": "Расширение для фильтрации нежелательной лексики и ограничения доступа к запрещенным веб-ресурсам.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "alarms",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "Cenz Control",
+    "default_popup": "views/popup.html"
+  },
+  "options_page": "views/options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "lib/shared.js",
+        "content-script.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "data/default-bundle.json",
+        "styles/common.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

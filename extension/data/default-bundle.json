@@ -1,0 +1,90 @@
+{
+  "version": "20260326T132227Z",
+  "updatedAt": "2026-03-26T13:22:27Z",
+  "metadata": {
+    "sourceLabel": "generated-by-updater",
+    "checkedAt": "2026-03-26T13:22:27Z",
+    "notes": "Bundle сформирован локальным скриптом и готов к публикации в GitHub Raw."
+  },
+  "blockedSites": [
+    {
+      "id": "demo_registry-1",
+      "type": "domain",
+      "value": "demo-danger.invalid",
+      "source": "demo_registry",
+      "note": "Собрано скриптом build_bundle.py"
+    },
+    {
+      "id": "demo_registry-2",
+      "type": "domain",
+      "value": "registry-test.invalid",
+      "source": "demo_registry",
+      "note": "Собрано скриптом build_bundle.py"
+    },
+    {
+      "type": "url-contains",
+      "value": "blocked-zone.example/test",
+      "id": "rkn_registry-2",
+      "source": "rkn_registry",
+      "note": "Получено из выгрузки официального реестра РКН."
+    }
+  ],
+  "dictionary": [
+    {
+      "id": "rule-blya",
+      "lemma": "брань группы бля",
+      "severity": "medium",
+      "replacement": "грубое выражение",
+      "patterns": [
+        "бл[яа](?:д|т|ть|ха|шка|шк[аи]|ну)?",
+        "blya(?:d|t)?"
+      ]
+    },
+    {
+      "id": "rule-suka",
+      "lemma": "оскорбления группы сук",
+      "severity": "medium",
+      "replacement": "оскорбление",
+      "patterns": [
+        "сук(?:а|и|ой|у|ам|ами|ах|ин|ины|е)",
+        "suka"
+      ]
+    },
+    {
+      "id": "rule-hren",
+      "lemma": "брань группы хер",
+      "severity": "low",
+      "replacement": "нежелательное слово",
+      "patterns": [
+        "хер(?:ня|овый|ово|ово[йм]?|ом|оват|асе)?",
+        "her(?:nya)?"
+      ]
+    },
+    {
+      "id": "rule-mudak",
+      "lemma": "оскорбления группы мудак",
+      "severity": "medium",
+      "replacement": "оскорбление",
+      "patterns": [
+        "мудак(?:а|и|ом|у|ами|ов)?",
+        "mudak"
+      ]
+    },
+    {
+      "id": "rule-pizd",
+      "lemma": "брань группы пизд",
+      "severity": "high",
+      "replacement": "грубое выражение",
+      "patterns": [
+        "пизд(?:а|ец|еца|еть|ит|еж|юк|юк[аи])",
+        "pizd(?:a|ec|et)"
+      ]
+    }
+  ],
+  "exceptions": [
+    "рисунок",
+    "страхер",
+    "сукно",
+    "херсон"
+  ]
+}

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cenz Control</title>
+    <link rel="stylesheet" href="../styles/common.css">
+  </head>
+  <body class="cc-shell cc-popup">
+    <main class="panel">
+      <section class="hero">
+        <p class="eyebrow">Cenz Control</p>
+        <h1>Тихий контроль цифровой среды</h1>
+        <p class="muted" id="siteHost">Загрузка статуса страницы...</p>
+      </section>
+
+      <section class="grid two">
+        <article class="card">
+          <p class="label">Фильтрация текста</p>
+          <label class="toggle">
+            <input type="checkbox" id="filteringEnabled">
+            <span>Включена</span>
+          </label>
+        </article>
+
+        <article class="card">
+          <p class="label">Блокировка сайтов</p>
+          <label class="toggle">
+            <input type="checkbox" id="blockingEnabled">
+            <span>Включена</span>
+          </label>
+        </article>
+      </section>
+
+      <section class="card">
+        <div class="metric-row">
+          <div>
+            <p class="label">Замены на странице</p>
+            <strong id="replacedCount">0</strong>
+          </div>
+          <div>
+            <p class="label">Проверено узлов</p>
+            <strong id="scannedNodes">0</strong>
+          </div>
+        </div>
+        <p class="muted" id="decisionText">Статус страницы будет показан здесь.</p>
+      </section>
+
+      <section class="card compact">
+        <p class="label">Последнее обновление словаря</p>
+        <strong id="bundleUpdatedAt">нет данных</strong>
+        <p class="muted" id="bundleSource">Источник не определен</p>
+      </section>
+
+      <section class="actions">
+        <button class="button primary" id="refreshButton" type="button">Обновить данные</button>
+        <button class="button" id="optionsButton" type="button">Настройки</button>
+      </section>
+    </main>
+
+    <script src="../lib/shared.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

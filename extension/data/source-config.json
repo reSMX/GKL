@@ -1,0 +1,11 @@
+{
+  "bundleUrl": "",
+  "sourceLabel": "github-source-config",
+  "configuredAt": null,
+  "repo": {
+    "owner": "",
+    "name": "",
+    "branch": "main",
+    "bundlePath": "extension/data/default-bundle.json"
+  }
+}

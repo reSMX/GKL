@@ -1,0 +1,28 @@
+{
+  "rkn_registry": {
+    "enabled": false,
+    "source": "data/rkn-export.sample.xml",
+    "format": "auto",
+    "headers_path": "",
+    "source_label": "rkn_registry"
+  },
+  "blocked_sites": [
+    {
+      "path": "data/blocked-sites.txt",
+      "type": "domain",
+      "source": "demo_registry"
+    }
+  ],
+  "dictionary": [
+    {
+      "path": "data/dictionary.json",
+      "source": "base_dictionary"
+    }
+  ],
+  "exceptions": [
+    {
+      "path": "data/exceptions.txt",
+      "source": "base_exceptions"
+    }
+  ]
+}

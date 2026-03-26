@@ -1,0 +1,52 @@
+[
+  {
+    "id": "rule-blya",
+    "lemma": "брань группы бля",
+    "severity": "medium",
+    "replacement": "грубое выражение",
+    "patterns": [
+      "бл[яа](?:д|т|ть|ха|шка|шк[аи]|ну)?",
+      "blya(?:d|t)?"
+    ]
+  },
+  {
+    "id": "rule-suka",
+    "lemma": "оскорбления группы сук",
+    "severity": "medium",
+    "replacement": "оскорбление",
+    "patterns": [
+      "сук(?:а|и|ой|у|ам|ами|ах|ин|ины|е)",
+      "suka"
+    ]
+  },
+  {
+    "id": "rule-hren",
+    "lemma": "брань группы хер",
+    "severity": "low",
+    "replacement": "нежелательное слово",
+    "patterns": [
+      "хер(?:ня|овый|ово|ово[йм]?|ом|оват|асе)?",
+      "her(?:nya)?"
+    ]
+  },
+  {
+    "id": "rule-mudak",
+    "lemma": "оскорбления группы мудак",
+    "severity": "medium",
+    "replacement": "оскорбление",
+    "patterns": [
+      "мудак(?:а|и|ом|у|ами|ов)?",
+      "mudak"
+    ]
+  },
+  {
+    "id": "rule-pizd",
+    "lemma": "брань группы пизд",
+    "severity": "high",
+    "replacement": "грубое выражение",
+    "patterns": [
+      "пизд(?:а|ец|еца|еть|ит|еж|юк|юк[аи])",
+      "pizd(?:a|ec|et)"
+    ]
+  }
+]

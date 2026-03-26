@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cenz Control - доступ ограничен</title>
+    <link rel="stylesheet" href="../styles/common.css">
+  </head>
+  <body class="cc-shell blocked-page">
+    <main class="panel wide">
+      <section class="hero">
+        <p class="eyebrow">Доступ ограничен</p>
+        <h1>Переход на страницу остановлен</h1>
+        <p class="muted">Этот ресурс совпал с правилом из актуального перечня ограничиваемых адресов.</p>
+      </section>
+
+      <section class="card">
+        <div class="stat-list">
+          <p><span>Запрошенный адрес:</span> <strong id="originalUrl">-</strong></p>
+          <p><span>Тип правила:</span> <strong id="ruleType">-</strong></p>
+          <p><span>Значение правила:</span> <strong id="ruleValue">-</strong></p>
+          <p><span>Источник записи:</span> <strong id="source">-</strong></p>
+        </div>
+        <p class="muted" id="note">Комментарий к записи отсутствует.</p>
+      </section>
+
+      <section class="actions">
+        <button class="button" id="backButton" type="button">Назад</button>
+        <button class="button primary" id="optionsButton" type="button">Открыть настройки</button>
+      </section>
+    </main>
+
+    <script src="../lib/shared.js"></script>
+    <script src="blocked.js"></script>
+  </body>
+</html>

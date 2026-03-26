@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<registry>
+  <record>
+    <domain>demo-danger.invalid</domain>
+    <url>https://blocked-zone.example/test</url>
+  </record>
+  <record>
+    <domain>registry-test.invalid</domain>
+  </record>
+</registry>

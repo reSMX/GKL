@@ -383,7 +383,7 @@
   }
 
   function canonicalizeToken(value) {
-    return normalizeToken(value).replaceAll("ё", "е");
+    return normalizeToken(value);
   }
 
   function getReplacement(rule, originalSlice) {

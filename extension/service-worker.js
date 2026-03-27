@@ -62,6 +62,9 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
       return;
     }
 
+    pageStatsByTab.delete(details.tabId);
+    void removeStoredPageStats(details.tabId);
+    chrome.action.setBadgeText({ tabId: details.tabId, text: "" });
     chrome.tabs.update(details.tabId, { url: buildBlockedPageUrl(details.url, decision.entry) });
   })();
 });
@@ -111,15 +114,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case "cc:getPopupState": {
         const tabId = Number(message.tabId);
         const url = String(message.url || "");
+        const tabUrl = String(message.tabUrl || url);
         const settings = await getSettings();
         const bundle = await ensureBundleLoaded({ forceRefresh: false });
-        const decision = await evaluateUrl(url, settings, bundle);
-        const stats = Number.isFinite(tabId) ? await getPageStats(tabId) : null;
+        const blockedPageContext = parseBlockedPageContext(tabUrl);
+        const inspectedUrl = blockedPageContext?.originalUrl || url;
+        const decision = blockedPageContext
+          ? {
+              blocked: true,
+              entry: {
+                type: blockedPageContext.ruleType || "unknown",
+                value: blockedPageContext.ruleValue || "",
+                source: blockedPageContext.source || "unknown",
+                note: blockedPageContext.note || ""
+              },
+              hostname: getHostnameFromUrl(inspectedUrl)
+            }
+          : await evaluateUrl(inspectedUrl, settings, bundle);
+        const stats = Number.isFinite(tabId) && !blockedPageContext ? await getPageStats(tabId) : null;
         const resolvedSource = await resolveBundleSource(settings);
 
         sendResponse({
           ok: true,
           settings,
+          isBlockedPage: Boolean(blockedPageContext),
           bundleMeta: {
             version: bundle.version,
             updatedAt: bundle.updatedAt,
@@ -550,6 +568,26 @@ function buildBlockedPageUrl(originalUrl, entry) {
   });
 
   return `${chrome.runtime.getURL("views/blocked.html")}?${params.toString()}`;
+}
+
+function parseBlockedPageContext(url) {
+  try {
+    const blockedPageUrl = chrome.runtime.getURL("views/blocked.html");
+    const parsedUrl = new URL(String(url || ""));
+    if (parsedUrl.href === blockedPageUrl || parsedUrl.href.startsWith(`${blockedPageUrl}?`)) {
+      return {
+        originalUrl: parsedUrl.searchParams.get("originalUrl") || "",
+        ruleType: parsedUrl.searchParams.get("ruleType") || "",
+        ruleValue: parsedUrl.searchParams.get("ruleValue") || "",
+        source: parsedUrl.searchParams.get("source") || "",
+        note: parsedUrl.searchParams.get("note") || ""
+      };
+    }
+  } catch (error) {
+    return null;
+  }
+
+  return null;
 }
 
 function isBrowserInternalUrl(url) {

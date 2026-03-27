@@ -15,14 +15,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const url = tab?.url || "";
-  const host = getHostnameFromUrl(url) || "локальная или внутренняя страница";
+  const currentUrl = tab?.url || "";
+  const blockedPageContext = parseBlockedPageContext(currentUrl);
+  const inspectedUrl = blockedPageContext?.originalUrl || currentUrl;
+  const host = getHostnameFromUrl(inspectedUrl) || "локальная или внутренняя страница";
   elements.siteHost.textContent = host;
 
   const response = await chrome.runtime.sendMessage({
     type: "cc:getPopupState",
     tabId: tab?.id,
-    url
+    url: inspectedUrl,
+    tabUrl: currentUrl
   });
 
   if (!response?.ok) {
@@ -43,7 +46,9 @@ function renderState(response, elements) {
   elements.bundleSource.textContent = `Источник: ${response.bundleMeta.sourceLabel}`;
 
   if (response.decision?.blocked) {
-    elements.decisionText.textContent = `Сайт совпадает с правилом ${response.decision.entry?.value}. При следующем переходе он будет перенаправлен на страницу блокировки.`;
+    elements.decisionText.textContent = response.isBlockedPage
+      ? `Текущий сайт заблокирован по правилу ${response.decision.entry?.value}. Доступ к странице уже ограничен.`
+      : `Сайт совпадает с правилом ${response.decision.entry?.value}. При следующем переходе он будет перенаправлен на страницу блокировки.`;
     return;
   }
 
@@ -77,4 +82,24 @@ function bindQuickToggles(settings, elements) {
   elements.optionsButton.addEventListener("click", () => {
     chrome.runtime.openOptionsPage();
   });
+}
+
+function parseBlockedPageContext(url) {
+  try {
+    const blockedPageUrl = chrome.runtime.getURL("views/blocked.html");
+    const parsedUrl = new URL(String(url || ""));
+    if (parsedUrl.href === blockedPageUrl || parsedUrl.href.startsWith(`${blockedPageUrl}?`)) {
+      return {
+        originalUrl: parsedUrl.searchParams.get("originalUrl") || "",
+        ruleType: parsedUrl.searchParams.get("ruleType") || "",
+        ruleValue: parsedUrl.searchParams.get("ruleValue") || "",
+        source: parsedUrl.searchParams.get("source") || "",
+        note: parsedUrl.searchParams.get("note") || ""
+      };
+    }
+  } catch (error) {
+    return null;
+  }
+
+  return null;
 }

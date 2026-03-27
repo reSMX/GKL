@@ -73,6 +73,12 @@ EB_PATTERNS = (
 SHORT_PROFANE_TERMS = {
     "еб",
 }
+MANUAL_EXTRA_TERMS = {
+    "довыёбываться",
+    "волоёб",
+    "дуроёб",
+    "дядеёб",
+}
 
 
 def read_text_source(path_or_url: str) -> str:
@@ -221,6 +227,7 @@ def load_dictionary(config: dict) -> list[dict]:
     source_config = config.get("manual_profane_terms", {})
     if source_config.get("path"):
         terms = extract_profane_terms(read_text_source(source_config["path"]).splitlines())
+        terms = sorted(set(terms) | MANUAL_EXTRA_TERMS)
         if terms:
             dictionary.append({
                 "id": "manual-profane-vocabulary",

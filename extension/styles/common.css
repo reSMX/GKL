@@ -32,8 +32,18 @@ body {
 }
 
 .cc-popup {
-  min-width: 360px;
+  width: min(380px, 100vw);
+  min-width: 0;
   min-height: 0;
+  max-height: 600px;
+  padding: 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.cc-popup .panel {
+  max-width: 100%;
 }
 
 .panel {
@@ -90,6 +100,7 @@ body {
 
 .muted {
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .grid {
@@ -187,6 +198,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  align-items: flex-start;
 }
 
 .metric-row strong {
@@ -223,6 +235,12 @@ textarea {
 
 @media (max-width: 640px) {
   .cc-shell {
+    padding: 14px;
+  }
+
+  .cc-popup {
+    width: min(100vw, 380px);
+    max-height: 100vh;
     padding: 14px;
   }
 

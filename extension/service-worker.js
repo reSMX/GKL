@@ -48,6 +48,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   pageStatsByTab.delete(tabId);
+  void removeStoredPageStats(tabId);
 });
 
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
@@ -98,7 +99,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             updatedAt: new Date().toISOString()
           };
 
-          pageStatsByTab.set(tabId, payload);
+          await storePageStats(tabId, payload);
           chrome.action.setBadgeBackgroundColor({ tabId, color: payload.replacedCount > 0 ? "#bd4f2d" : "#2f7d6f" });
           chrome.action.setBadgeText({ tabId, text: payload.replacedCount > 0 ? String(payload.replacedCount) : "" });
         }
@@ -113,7 +114,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const settings = await getSettings();
         const bundle = await ensureBundleLoaded({ forceRefresh: false });
         const decision = await evaluateUrl(url, settings, bundle);
-        const stats = Number.isFinite(tabId) ? pageStatsByTab.get(tabId) || null : null;
+        const stats = Number.isFinite(tabId) ? await getPageStats(tabId) : null;
         const resolvedSource = await resolveBundleSource(settings);
 
         sendResponse({
@@ -445,6 +446,46 @@ async function appendUpdateHistory(entry) {
   const nextHistory = [entry, ...history].slice(0, 12);
   await chrome.storage.local.set({
     [STORAGE_KEYS.updateHistory]: nextHistory
+  });
+}
+
+async function getPageStatsStorage() {
+  const stored = await chrome.storage.session.get(STORAGE_KEYS.pageStats);
+  const pageStats = stored[STORAGE_KEYS.pageStats];
+  return pageStats && typeof pageStats === "object" ? pageStats : {};
+}
+
+async function storePageStats(tabId, payload) {
+  pageStatsByTab.set(tabId, payload);
+  const pageStats = await getPageStatsStorage();
+  pageStats[String(tabId)] = payload;
+  await chrome.storage.session.set({
+    [STORAGE_KEYS.pageStats]: pageStats
+  });
+}
+
+async function getPageStats(tabId) {
+  if (pageStatsByTab.has(tabId)) {
+    return pageStatsByTab.get(tabId);
+  }
+
+  const pageStats = await getPageStatsStorage();
+  const storedStats = pageStats[String(tabId)] || null;
+  if (storedStats) {
+    pageStatsByTab.set(tabId, storedStats);
+  }
+  return storedStats;
+}
+
+async function removeStoredPageStats(tabId) {
+  const pageStats = await getPageStatsStorage();
+  if (!(String(tabId) in pageStats)) {
+    return;
+  }
+
+  delete pageStats[String(tabId)];
+  await chrome.storage.session.set({
+    [STORAGE_KEYS.pageStats]: pageStats
   });
 }
 

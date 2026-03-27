@@ -292,21 +292,19 @@
         }
       }
 
-      if (exactTerms.length === 0) {
-        const regexes = (rule.patterns || []).flatMap((pattern) => {
-          try {
-            return [new RegExp(`^(?:${pattern})$`, "iu")];
-          } catch (error) {
-            return [];
-          }
-        });
-
-        if (regexes.length > 0) {
-          regexRules.push({
-            ...descriptor,
-            regexes
-          });
+      const regexes = (rule.patterns || []).flatMap((pattern) => {
+        try {
+          return [new RegExp(`^(?:${pattern})$`, "iu")];
+        } catch (error) {
+          return [];
         }
+      });
+
+      if (regexes.length > 0) {
+        regexRules.push({
+          ...descriptor,
+          regexes
+        });
       }
     }
 

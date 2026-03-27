@@ -1,6 +1,14 @@
 (() => {
-  if (globalThis.__cenzControlContentScriptController?.deactivate) {
-    globalThis.__cenzControlContentScriptController.deactivate();
+  try {
+    if (globalThis.__cenzControlContentScriptController?.deactivate) {
+      globalThis.__cenzControlContentScriptController.deactivate();
+    }
+  } catch (error) {
+    if (String(error?.message || error || "").includes("Extension context invalidated")) {
+      delete globalThis.__cenzControlContentScriptController;
+    } else {
+      throw error;
+    }
   }
 
   const {
@@ -74,8 +82,16 @@
     state.settings = response.settings;
     state.bundle = response.bundle;
     state.isTrusted = response.isTrusted;
-    state.exceptionTokens = collectExceptionTokens();
-    state.compiledRules = compileRules();
+    try {
+      state.exceptionTokens = collectExceptionTokens();
+      state.compiledRules = compileRules();
+    } catch (error) {
+      if (isExtensionContextInvalidatedError(error)) {
+        deactivateExtensionContext();
+        return;
+      }
+      throw error;
+    }
 
     if (!state.settings.filteringEnabled || state.isTrusted) {
       scheduleReport();

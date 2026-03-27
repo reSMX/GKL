@@ -108,10 +108,7 @@ def resolve_source_path(source: str) -> str:
 
 def normalize_character(character: str) -> str:
     lowered = character.lower()
-    normalized = CONFUSABLE_MAP.get(lowered, lowered)
-    if normalized == "ё":
-        return "е"
-    return normalized
+    return CONFUSABLE_MAP.get(lowered, lowered)
 
 
 def normalize_term(term: str) -> str:
@@ -124,7 +121,7 @@ def normalize_term(term: str) -> str:
 
 
 def canonicalize_term(term: str) -> str:
-    return normalize_term(term)
+    return normalize_term(term).replace("ё", "е")
 
 
 def looks_profane(term: str) -> bool:

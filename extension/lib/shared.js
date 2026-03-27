@@ -85,10 +85,6 @@
       return CONFUSABLE_MAP[lower];
     }
 
-    if (lower === "ё") {
-      return "е";
-    }
-
     return lower;
   }
 

@@ -70,6 +70,9 @@ EB_PATTERNS = (
     re.compile(r"^(?:вы|за|до|на|по|про|под|пере|об|от|с|съ|вз|въ|из|изъ|раз|у|при|недо|подъ)[её]б", re.IGNORECASE),
     re.compile(r"[её]б(?:а|л|н|т|уч|ош|аш|ун|ыр|от|ок|ец|арь|ист|лив|ищ|ц|ст|ти|ля|ло|ель|аль|ан)", re.IGNORECASE),
 )
+SHORT_PROFANE_TERMS = {
+    "еб",
+}
 
 
 def read_text_source(path_or_url: str) -> str:
@@ -123,6 +126,9 @@ def canonicalize_term(term: str) -> str:
 
 def looks_profane(term: str) -> bool:
     canonical = canonicalize_term(term)
+    if canonical in SHORT_PROFANE_TERMS:
+        return True
+
     if len(canonical) < 3:
         return False
 

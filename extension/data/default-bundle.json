@@ -1,9 +1,9 @@
 {
-  "version": "20261012T113633Z",
-  "updatedAt": "2026-10-12T11:36:33Z",
+  "version": "20261019T093213Z",
+  "updatedAt": "2026-10-19T09:32:13Z",
   "metadata": {
     "sourceLabel": "generated-by-updater",
-    "checkedAt": "2026-10-12T11:36:33Z",
+    "checkedAt": "2026-10-19T09:32:13Z",
     "notes": "Bundle сформирован локальным скриптом, включает weekly upstream из Re-filter-lists, статичный adult-список и ручной словарь матов."
   },
   "blockedSites": [
